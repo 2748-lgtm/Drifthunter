@@ -1,24 +1,23 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Google Docs</title>
 
 <style>
 body {
   margin: 0;
   background: #111;
-  font-family: Arial, sans-serif;
   color: white;
+  font-family: Arial;
 }
 
 .top-bar {
-  padding: 10px;
   background: #000;
+  padding: 10px;
   display: flex;
   justify-content: space-between;
-  flex-wrap: wrap;
 }
 
 button {
@@ -29,10 +28,11 @@ button {
   cursor: pointer;
 }
 
-.green { background: #28a745; color: white; }
-.blue { background: #007bff; color: white; }
-.orange { background: #ff9800; color: white; }
-.red { background: #dc3545; color: white; }
+.green { background:#28a745; }
+.blue { background:#007bff; }
+.orange { background:#ff9800; }
+.red { background:#dc3545; }
+.purple { background:#6f42c1; }
 
 .game-container {
   width: 100%;
@@ -43,6 +43,25 @@ iframe {
   width: 100%;
   height: 100%;
   border: none;
+}
+
+/* ADMIN */
+#adminPanel, #lockScreen {
+  position: fixed;
+  top:0; left:0;
+  width:100%; height:100%;
+  background: rgba(0,0,0,0.95);
+  display:none;
+  z-index:9999;
+}
+
+.box {
+  max-width: 400px;
+  margin: 100px auto;
+  background: #222;
+  padding: 20px;
+  border-radius: 10px;
+  text-align:center;
 }
 </style>
 </head>
@@ -60,90 +79,176 @@ iframe {
   </div>
 </div>
 
-<div class="game-container" id="gameContainer">
-  <iframe src="https://htmlxm.github.io/h/drift-hunters"></iframe>
+<div class="game-container">
+  <iframe id="gameFrame"></iframe>
+</div>
+
+<!-- ADMIN -->
+<div id="adminPanel">
+  <div class="box" id="loginBox">
+    <h2>Admin Login</h2>
+    <input type="password" id="code" placeholder="Enter code">
+    <br><br>
+    <button class="green" onclick="login()">Enter</button>
+  </div>
+
+  <div class="box" id="menu" style="display:none;">
+    <h2>Admin Panel</h2>
+
+    <h3>🎮 Games</h3>
+    <div id="gameList"></div>
+
+    <hr>
+    <button class="blue" onclick="addGame()">Add Game</button>
+    <button class="orange" onclick="removeGame()">Remove Game</button>
+
+    <hr>
+    <button class="red" onclick="disableAccess()">Disable Access</button>
+    <button class="green" onclick="restoreAccess()">Restore Access</button>
+
+    <br><br>
+    <button onclick="closeAdmin()">Close</button>
+  </div>
+</div>
+
+<!-- LOCK -->
+<div id="lockScreen">
+  <div class="box">
+    <h2>Access Disabled</h2>
+    <p>This version is locked.</p>
+  </div>
 </div>
 
 <script>
-function goFullscreen() {
-  let elem = document.getElementById("gameContainer");
-  if (elem.requestFullscreen) elem.requestFullscreen();
+/* ADMIN CODES */
+const ADMIN_CODES = ["frankmag12"];
+
+/* GAMES */
+let games = [
+  {name:"Drift Hunters", url:"https://htmlxm.github.io/h/drift-hunters"},
+  {name:"Slope", url:"https://ubg365.github.io/slope/"}
+];
+
+/* LOAD GAMES */
+function loadGames(){
+  let list = document.getElementById("gameList");
+  list.innerHTML = "";
+  games.forEach(g=>{
+    let btn = document.createElement("button");
+    btn.className="purple";
+    btn.innerText=g.name;
+    btn.onclick=()=> gameFrame.src = g.url;
+    list.appendChild(btn);
+  });
 }
 
-function getGameData() {
-  let data = {};
-  for (let i = 0; i < localStorage.length; i++) {
-    let key = localStorage.key(i);
-
-    if (key.toLowerCase().includes("drift") || key.toLowerCase().includes("unity")) {
-      data[key] = localStorage.getItem(key);
-    }
-  }
-  return data;
-}
-
-function saveGame() {
-  let data = getGameData();
-  let blob = new Blob([JSON.stringify(data)], { type: "application/json" });
-
-  let a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = "drift-save.json";
-  a.click();
-}
-
-function loadGame() {
-  document.getElementById("fileInput").click();
-}
-
-document.getElementById("fileInput").addEventListener("change", function(e) {
-  let file = e.target.files[0];
-  let reader = new FileReader();
-
-  reader.onload = function() {
-    let data = JSON.parse(reader.result);
-
-    for (let key in data) {
-      localStorage.setItem(key, data[key]);
-    }
-
-    alert("Save loaded! Reloading...");
-    location.reload();
-  };
-
-  reader.readAsText(file);
-});
-
-setInterval(() => {
-  let data = getGameData();
-  localStorage.setItem("autoSave_drift", JSON.stringify(data));
-}, 10000);
-
+/* INIT */
 window.onload = () => {
-  let auto = localStorage.getItem("autoSave_drift");
-  if (auto) {
-    let data = JSON.parse(auto);
-    for (let key in data) {
-      localStorage.setItem(key, data[key]);
-    }
+  gameFrame.src = games[0].url;
+
+  if(localStorage.getItem("locked")==="true"){
+    lockScreen.style.display="block";
   }
 };
 
-document.title = "Google Docs";
-let link = document.createElement('link');
-link.rel = 'icon';
-link.href = "https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico";
-document.head.appendChild(link);
-
-function panic() {
-  window.location.href = "https://classroom.google.com/?pli=1";
+/* ADMIN */
+function openAdmin(){
+  adminPanel.style.display="block";
 }
 
-document.addEventListener("keydown", function(e) {
-  if (e.key === "Escape") {
-    panic();
+function closeAdmin(){
+  adminPanel.style.display="none";
+}
+
+function login(){
+  let val = code.value;
+  if(ADMIN_CODES.includes(val)){
+    loginBox.style.display="none";
+    menu.style.display="block";
+    loadGames();
+  } else {
+    alert("Wrong code");
+  }
+}
+
+/* GAME MGMT */
+function addGame(){
+  let name = prompt("Game name:");
+  let url = prompt("Game URL:");
+  if(name && url){
+    games.push({name,url});
+    loadGames();
+  }
+}
+
+function removeGame(){
+  let name = prompt("Game name to remove:");
+  games = games.filter(g=>g.name !== name);
+  loadGames();
+}
+
+/* ACCESS CONTROL */
+function disableAccess(){
+  if(confirm("Disable access?")){
+    localStorage.setItem("locked","true");
+    lockScreen.style.display="block";
+  }
+}
+
+function restoreAccess(){
+  localStorage.removeItem("locked");
+  lockScreen.style.display="none";
+}
+
+/* SAVE SYSTEM */
+function saveGame(){
+  let blob = new Blob([JSON.stringify(localStorage)]);
+  let a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "save.json";
+  a.click();
+}
+
+function loadGame(){
+  fileInput.click();
+}
+
+fileInput.onchange = e => {
+  let reader = new FileReader();
+  reader.onload = () => {
+    let data = JSON.parse(reader.result);
+    for(let k in data) localStorage.setItem(k,data[k]);
+    location.reload();
+  };
+  reader.readAsText(e.target.files[0]);
+};
+
+/* FULLSCREEN */
+function goFullscreen(){
+  document.body.requestFullscreen();
+}
+
+/* PANIC */
+function panic(){
+  window.location.href="https://classroom.google.com/";
+}
+
+/* KEYBINDS */
+document.addEventListener("keydown", e=>{
+  if(e.key === "Escape"){
+    openAdmin(); // ESC = admin
+  }
+  if(e.key === "`"){
+    panic(); // ~ key = panic
   }
 });
+
+/* disguise */
+document.title="Google Docs";
+let link=document.createElement("link");
+link.rel="icon";
+link.href="https://ssl.gstatic.com/docs/documents/images/kix-favicon7.ico";
+document.head.appendChild(link);
 </script>
 
 </body>
